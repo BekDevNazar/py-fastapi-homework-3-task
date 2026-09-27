@@ -73,7 +73,7 @@ async def get_user_by_email(email: str, db: AsyncSession):
 )
 async def register(
         data: UserRegistrationRequestSchema
-        ,db: AsyncSession = Depends(get_db)
+        , db: AsyncSession = Depends(get_db)
 ):
     user = await get_user_by_email(email=data.email, db=db)
 
@@ -243,7 +243,7 @@ async def reset_password_complete(
             detail="Invalid email or token."
         )
 
-    if reset_token.user_id != user.id or user.is_active == False:
+    if reset_token.user_id != user.id or not user.is_active:
         await db.delete(reset_token)
         await db.commit()
         raise HTTPException(
@@ -260,7 +260,7 @@ async def reset_password_complete(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while resetting the password."
         )
-    return { "message": "Password reset successfully." }
+    return {"message": "Password reset successfully."}
 
 
 @router.post(
@@ -281,7 +281,7 @@ async def login(
             detail="Invalid email or password."
 
         )
-    if user.is_active == False:
+    if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is not activated."
@@ -343,8 +343,7 @@ async def update_access_token(
         )
     result = await db.execute(
         select(RefreshTokenModel)
-        .where(RefreshTokenModel.token == refresh_token.refresh_token
-        )
+        .where(RefreshTokenModel.token == refresh_token.refresh_token)
     )
     token = result.scalar_one_or_none()
     if token is None:
