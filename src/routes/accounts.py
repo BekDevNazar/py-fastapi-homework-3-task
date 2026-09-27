@@ -2,10 +2,10 @@ from datetime import datetime, timezone, timedelta
 from typing import cast
 
 from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session, joinedload
+
 
 from config import get_jwt_auth_manager, get_settings, BaseAppSettings
 from database import (
@@ -17,18 +17,30 @@ from database import (
     PasswordResetTokenModel,
     RefreshTokenModel
 )
-from exceptions import BaseSecurityError, TokenExpiredError, InvalidTokenError
-from schemas.accounts import AccountRead, UserRegistrationRequestSchema, TokenCheck, AccountBase, ResetPassword, AccountLogin, Token, \
+from exceptions import TokenExpiredError, InvalidTokenError
+from schemas.accounts import (
+    AccountRead,
+    UserRegistrationRequestSchema,
+    TokenCheck,
+    AccountBase,
+    ResetPassword,
+    AccountLogin,
+    Token,
     RefreshToken
+)
 from security.interfaces import JWTAuthManagerInterface
-from security.token_manager import JWTAuthManager
+
 
 router = APIRouter()
 
 
-async def create_account(db: AsyncSession, data: UserRegistrationRequestSchema):
+async def create_account(
+        db: AsyncSession,
+        data: UserRegistrationRequestSchema
+):
     result = await db.execute(
-        select(UserGroupModel).where(UserGroupModel.name == UserGroupEnum.USER)
+        select(UserGroupModel)
+        .where(UserGroupModel.name == UserGroupEnum.USER)
     )
     group = result.scalar_one()
 
@@ -48,7 +60,9 @@ async def create_account(db: AsyncSession, data: UserRegistrationRequestSchema):
 
 
 async def get_user_by_email(email: str, db: AsyncSession):
-    result = await db.execute(select(UserModel).where(UserModel.email == email))
+    result = await db.execute(
+        select(UserModel)
+        .where(UserModel.email == email))
     return result.scalar_one_or_none()
 
 
@@ -57,11 +71,17 @@ async def get_user_by_email(email: str, db: AsyncSession):
     response_model=AccountRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def register(data: UserRegistrationRequestSchema, db: AsyncSession = Depends(get_db)):
+async def register(
+        data: UserRegistrationRequestSchema
+        ,db: AsyncSession = Depends(get_db)
+):
     user = await get_user_by_email(email=data.email, db=db)
 
     if user:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"A user with this email {user.email} already exists.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A user with this email {user.email} already exists."
+        )
     try:
         user_create = await create_account(db=db, data=data)
         await db.commit()
@@ -77,7 +97,10 @@ async def register(data: UserRegistrationRequestSchema, db: AsyncSession = Depen
 
 
 @router.post("/activate/")
-async def activate_user(data: TokenCheck, db: AsyncSession = Depends(get_db)):
+async def activate_user(
+        data: TokenCheck,
+        db: AsyncSession = Depends(get_db)
+):
     user = await get_user_by_email(email=data.email, db=db)
     if user is None:
         raise HTTPException(
@@ -92,7 +115,8 @@ async def activate_user(data: TokenCheck, db: AsyncSession = Depends(get_db)):
         )
 
     result = await db.execute(
-        select(ActivationTokenModel).where(ActivationTokenModel.user_id == user.id)
+        select(ActivationTokenModel)
+        .where(ActivationTokenModel.user_id == user.id)
     )
     active_token = result.scalar_one_or_none()
 
@@ -124,7 +148,10 @@ async def activate_user(data: TokenCheck, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.post("/password-reset/request/", status_code=status.HTTP_200_OK)
+@router.post(
+    "/password-reset/request/",
+    status_code=status.HTTP_200_OK
+)
 async def reset_password(
     data: AccountBase,
     db: AsyncSession = Depends(get_db)
@@ -133,7 +160,9 @@ async def reset_password(
 
     if user is None or not user.is_active:
         return {
-            "message": "If you are registered, you will receive an email with instructions."
+            "message":
+                "If you are registered,"
+                " you will receive an email with instructions."
         }
 
     result = await db.execute(
@@ -154,14 +183,19 @@ async def reset_password(
     await db.commit()
 
     return {
-        "message": "If you are registered, you will receive an email with instructions."
+        "message": "If you are registered,"
+                   " you will receive an email with instructions."
     }
 
 
 @router.post("/reset-password/complete/")
-async def reset_password_complete(data: ResetPassword, db: AsyncSession = Depends(get_db)):
+async def reset_password_complete(
+        data: ResetPassword,
+        db: AsyncSession = Depends(get_db)
+):
     result_password = await db.execute(
-        select(PasswordResetTokenModel).where(PasswordResetTokenModel.token == data.token)
+        select(PasswordResetTokenModel).
+        where(PasswordResetTokenModel.token == data.token)
     )
 
     reset_token = result_password.scalar_one_or_none()
